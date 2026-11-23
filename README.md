@@ -1,35 +1,43 @@
-# ULTRA HACKER 4.0
+# ULTRA HACKER ULTIMATE 5.0
 
-Native Android toolkit for authorized cybersecurity learning and diagnostics.
+Native Android toolkit for authorized cybersecurity learning, troubleshooting and defensive diagnostics.
 
-## Features
-- Dark dashboard with HOME, TOOLS and TERMINAL
-- DNS lookup, reachability checks, local interface information and bounded LAN discovery
-- Restricted common-port checks for private IPv4 addresses only
-- Local URL structure and deception-signal review (heuristic only; not malware detection)\n- HTTPS security-header inspection and public RDAP lookup
-- SSL/TLS certificate details and HTTP response analysis
-- SHA-256 hashing, Base64 encode/decode and local secure password generation
-- Per-app cumulative network traffic counters
-- Local scan history (up to 50 results) and terminal command history (up to 100 commands)
-- PDF export of saved scan results and recent terminal commands
-- Arabic/English smart phrases mapped to a fixed set of reviewed diagnostic actions (no arbitrary shell execution)
-- Automatic stop countdown: closes the app and interrupts the active diagnostic task after 5, 10, 15, 30, 60 or 120 minutes; can be cancelled
-- Terminal commands: help, clear, date, whoami, ip, dns, ping, ports, rdap, headers, ssl, http, urlcheck, sha256, b64encode, b64decode, traffic, passgen, history, report, netcheck, autostop, stopcancel
+## Included capabilities
+- Dark mobile dashboard with HOME, TOOLS and TERMINAL.
+- DNS resolution, reachability checks, local interface details and bounded discovery on the user's local private subnet.
+- Restricted TCP checks for ports 22, 80, 443 and 8080 on private IPv4 addresses only.
+- HTTPS security-header inspection, TLS certificate details and HTTP response analysis.
+- RDAP domain registration lookup.
+- Local URL structure review for basic deception indicators (not a malware/reputation scanner).
+- SHA-256 hashing, Base64 encode/decode and cryptographically secure local password generation.
+- Per-app cumulative network traffic counters.
+- Persistent local scan history and terminal command history.
+- PDF report export.
+- Arabic/English smart phrases mapped to a fixed allowlist of diagnostic actions. No arbitrary shell execution or remote command execution.
+- Automatic stop timer (1–1440 minutes), persisted across Activity recreation, with cancellation.
+- Active diagnostic task cancellation from the terminal CANCEL button or the `cancel` command.
+- Commands: `help`, `clear`, `date`, `whoami`, `ip`, `dns`, `ping`, `ports`, `rdap`, `headers`, `ssl`, `http`, `urlcheck`, `sha256`, `b64encode`, `b64decode`, `traffic`, `passgen`, `history`, `report`, `netcheck`, `autostop`, `stopcancel`, `cancel`, `stopnow`.
 
 ## Smart phrase examples
 - `اعرض الشبكة` → `ip`
 - `افحص DNS example.com` → `dns example.com`
 - `اختبر الاتصال example.com` → `ping example.com`
 - `افحص الموقع example.com` → `headers example.com`
-- `حلل أمان الرابط https://example.com` → local URL structure review\n- `أوقف التطبيق بعد 10 دقائق` → schedule automatic stop
-- `أوقف الإيقاف التلقائي` → cancel the timer
+- `حلل أمان الرابط https://example.com` → `urlcheck`
+- `أوقف التطبيق بعد 10 دقائق` → schedule automatic stop
+- `أوقف الإيقاف التلقائي` → cancel timer
+- `أوقف المهمة` → request cancellation of the active diagnostic
+- `أوقف التطبيق الآن` → close the app
+
+## Safety and limitations
+- This is an Android diagnostics app, not a root shell, full Linux terminal, exploit framework or autonomous hacking agent.
+- Network checks are intended for devices, networks and websites you own or are explicitly authorized to assess.
+- Port checks are restricted to private IPv4 targets and a small fixed port list.
+- URL review is heuristic only and cannot guarantee a site is safe.
+- Auto-stop requests Android to close the app and interrupts the active task; Android may still control process lifecycle.
+- ICMP reachability may be blocked by the network.
+- Traffic counters are cumulative UID counters since boot, not live throughput.
+- Reports are stored in the app-specific Documents directory.
 
 ## Build
-Push to main or manually run **Build Android APK** in GitHub Actions. Download the artifact named `ultra-hacker-v4.0-debug-apk`.
-
-## Notes
-- The app is not a root shell or full Linux terminal.
-- Reports are saved in the app-specific Documents directory.
-- Traffic counters are cumulative Android UID counters since boot; they are not live throughput measurements.
-- ICMP reachability may be blocked by Android or the network.
-- Use assessment tools only on systems you own or are explicitly authorized to test.
+Push to `main` or manually run **Build Android APK** in GitHub Actions. Download the artifact `ultra-hacker-ultimate-v5.0-debug-apk`.
