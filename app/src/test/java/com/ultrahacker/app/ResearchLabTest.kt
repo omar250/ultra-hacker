@@ -11,7 +11,7 @@ class ResearchLabTest {
         )
         assertTrue(report.contains("Process execution API"))
         assertTrue(report.contains("line(s) 2"))
-        assertTrue(report.contains("not executed"))
+        assertTrue(report.contains("was not run"))
     }
 
     @Test
