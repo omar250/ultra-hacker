@@ -61,7 +61,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("ULTRA", 25f, neon, true))
         header.addView(label(" HACKER", 25f, Color.WHITE, true))
-        header.addView(label("  /  v3.6", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("  /  v4.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
         root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
@@ -136,6 +136,9 @@ class MainActivity : Activity() {
         card("◇  DNS & RDAP", "Resolve hostnames and retrieve public registration data") {
             tab = "TOOLS"; render()
         }
+        card("◎  URL SAFETY REVIEW", "Review URL structure and common deception signals locally") {
+            tab = "TOOLS"; render()
+        }
     }
 
     private fun showTools() {
@@ -158,6 +161,11 @@ class MainActivity : Activity() {
         card("PRIVATE PORT CHECK", "Check ports 22, 80, 443 and 8080 on a private IPv4 address") {
             ask("PRIVATE PORT CHECK", "Private IP, e.g. 192.168.1.10") { host ->
                 runTask("Checking $host…") { checkPrivatePorts(host) }
+            }
+        }
+        card("URL SAFETY REVIEW", "Inspect URL structure, HTTPS use and common deception signals locally") {
+            ask("URL SAFETY REVIEW", "Paste a URL, e.g. https://example.com") { value ->
+                runTask("Reviewing URL structure…") { urlSafetyReview(value) }
             }
         }
         card("HTTPS SECURITY HEADERS", "Review common browser security headers; no exploitation") {
@@ -287,7 +295,7 @@ class MainActivity : Activity() {
         val p = normalized.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
+            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
             "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
@@ -299,6 +307,7 @@ class MainActivity : Activity() {
             "headers" -> if (arg.isBlank()) append("Usage: headers <domain>") else runTask("HTTPS headers $arg") { inspectHeaders(arg) }
             "ssl" -> if (arg.isBlank()) append("Usage: ssl <hostname>") else runTask("SSL certificate") { sslCertificate(arg) }
             "http" -> if (arg.isBlank()) append("Usage: http <https-url>") else runTask("HTTP analysis") { httpAnalysis(arg) }
+            "urlcheck" -> if (arg.isBlank()) append("Usage: urlcheck <url>") else runTask("URL safety review") { urlSafetyReview(arg) }
             "sha256" -> if (arg.isBlank()) append("Usage: sha256 <text>") else append(sha256(arg))
             "b64encode" -> if (arg.isBlank()) append("Usage: b64encode <text>") else append(base64Encode(arg))
             "b64decode" -> if (arg.isBlank()) append("Usage: b64decode <base64>") else append(base64Decode(arg))
@@ -327,7 +336,8 @@ class MainActivity : Activity() {
             Regex("""^(?:احسب بصمة sha ?256|بصمة sha ?256)\s+(.+)$""", RegexOption.IGNORE_CASE) to "sha256",
             Regex("""^(?:شفّر base64|ترميز base64)\s+(.+)$""", RegexOption.IGNORE_CASE) to "b64encode",
             Regex("""^(?:فك base64|فك ترميز base64)\s+(.+)$""", RegexOption.IGNORE_CASE) to "b64decode",
-            Regex("""^(?:أوقف التطبيق بعد|اوقف التطبيق بعد|إيقاف تلقائي بعد)\s+(\d+)\s*(?:دقيقة|دقائق|min|minutes?)$""", RegexOption.IGNORE_CASE) to "autostop"
+            Regex("""^(?:أوقف التطبيق بعد|اوقف التطبيق بعد|إيقاف تلقائي بعد)\s+(\d+)\s*(?:دقيقة|دقائق|min|minutes?)$""", RegexOption.IGNORE_CASE) to "autostop",
+            Regex("""^(?:حلل أمان الرابط|افحص أمان الرابط|تحقق من الرابط)\s+(.+)$""", RegexOption.IGNORE_CASE) to "urlcheck"
         )
         for ((regex, command) in patterns) {
             val match = regex.matchEntire(value)
@@ -536,6 +546,34 @@ class MainActivity : Activity() {
         } finally { c.disconnect() }
     }
 
+    private fun urlSafetyReview(rawUrl: String): String {
+        val value = rawUrl.trim()
+        require(value.isNotEmpty() && !value.any { it.isWhitespace() }) { "Enter a URL without spaces." }
+        val candidate = if (value.contains("://")) value else "https://$value"
+        val uri = try { URI(candidate) } catch (_: Exception) {
+            throw IllegalArgumentException("The URL format is invalid.")
+        }
+        val scheme = uri.scheme?.lowercase(Locale.ROOT)
+        require(scheme == "https" || scheme == "http") { "Only HTTP and HTTPS URLs are supported." }
+        val host = uri.host ?: throw IllegalArgumentException("A valid hostname is required.")
+        val signals = mutableListOf<String>()
+        if (scheme != "https") signals.add("WARNING: HTTP does not encrypt the connection.")
+        else signals.add("HTTPS scheme is present; certificate validity was not tested.")
+        if (uri.rawUserInfo != null) signals.add("WARNING: URL contains user-info before the host; this can disguise the destination.")
+        if (host.split(".").any { it.startsWith("xn--", true) }) {
+            signals.add("NOTICE: Internationalized/punycode hostname; verify the spelling carefully.")
+        }
+        if (host.matches(Regex("""\d{1,3}(?:\.\d{1,3}){3}""")) || host.startsWith("[") || host.contains(":")) {
+            signals.add("NOTICE: URL uses an IP-literal host instead of a conventional domain name.")
+        }
+        if (uri.port != -1 && uri.port !in listOf(80, 443)) signals.add("NOTICE: Non-standard port ${uri.port} is specified.")
+        if (uri.rawFragment != null) signals.add("INFO: URL contains a fragment; fragments are normally handled by the browser.")
+        if (signals.isEmpty()) signals.add("No basic structural warning was detected.")
+        return "URL: $candidate\nHost: $host\nScheme: $scheme\n\nSTRUCTURAL REVIEW\n" +
+            signals.joinToString("\n") +
+            "\n\nLIMITATION: Local heuristic only; not malware detection, reputation checking or a safety guarantee."
+    }
+
     private fun sha256(value: String): String {
         val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
         return bytes.joinToString("") { "%02x".format(it) }
@@ -651,7 +689,7 @@ class MainActivity : Activity() {
                 y += if (bold) 28f else 15f
             }
         }
-        line("ULTRA HACKER 3.6 SECURITY REPORT", true)
+        line("ULTRA HACKER 4.0 SECURITY REPORT", true)
         line("Generated: " + Date().toString())
         line("For authorized diagnostic use only.")
         y += 12f
