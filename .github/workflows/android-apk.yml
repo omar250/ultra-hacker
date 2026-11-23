@@ -32,8 +32,10 @@ jobs:
         run: |
           java -version
           gradle --version
-      - name: Build debug APK
-        run: gradle --no-daemon clean testDebugUnitTest assembleDebug
+      - name: Run unit tests
+        run: gradle --no-daemon testDebugUnitTest
+      - name: Assemble debug APK
+        run: gradle --no-daemon assembleDebug
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
