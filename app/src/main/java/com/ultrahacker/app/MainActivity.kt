@@ -483,15 +483,15 @@ class MainActivity : Activity() {
         if (requested.isEmpty()) return "This app does not declare runtime permissions."
         val flags = info.requestedPermissionsFlags ?: IntArray(requested.size)
         return buildString {
-            append("PACKAGE: ").append(packageName).append("\\n")
-            append("PERMISSIONS DECLARED BY THIS APP ONLY\\n")
+            append("PACKAGE: ").append(packageName).append("\n")
+            append("PERMISSIONS DECLARED BY THIS APP ONLY\n")
             requested.forEachIndexed { index, permission ->
                 val granted = index < flags.size &&
                     (flags[index] and android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0
                 append(if (granted) "[GRANTED] " else "[NOT GRANTED] ")
-                    .append(permission).append("\\n")
+                    .append(permission).append("\n")
             }
-            append("\\nThis report does not inspect other apps or bypass Android permission controls.")
+            append("\nThis report does not inspect other apps or bypass Android permission controls.")
         }
     }
 
