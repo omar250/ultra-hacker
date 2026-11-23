@@ -14,7 +14,7 @@ Native Android toolkit for authorized cybersecurity learning and diagnostics.
 - PDF export of saved scan results and recent terminal commands
 - Arabic/English smart phrases mapped to a fixed set of reviewed diagnostic actions (no arbitrary shell execution)
 - Automatic stop countdown: closes the app and interrupts the active diagnostic task after 5, 10, 15, 30, 60 or 120 minutes; can be cancelled
-- Terminal commands: help, clear, date, whoami, ip, dns, ping, ports, rdap, headers, ssl, http, sha256, b64encode, b64decode, traffic, passgen, history, report, netcheck, autostop, stopcancel
+- Terminal commands: help, clear, date, whoami, ip, dns, ping, ports, rdap, headers, ssl, http, urlcheck, sha256, b64encode, b64decode, traffic, passgen, history, report, netcheck, autostop, stopcancel
 
 ## Smart phrase examples
 - `اعرض الشبكة` → `ip`
