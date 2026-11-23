@@ -220,7 +220,8 @@ class MainActivity : Activity() {
             runTask("Running isolated behavior simulation…") { ResearchLab.simulateBenignBehavior() }
         }
         card("ANDROID SECURITY BASELINE", "Review Android version, security patch and basic build posture") {
-            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }\n        }
+            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }
+        }
         card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
             runTask("Reviewing this app's permissions…") { ownPermissionReport() }
         }
@@ -340,7 +341,8 @@ class MainActivity : Activity() {
             "help" -> append("help | clear | date | whoami | devicecheck | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
-            "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")\n            "devicecheck" -> append(DevicePosture.report(this))
+            "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
+            "devicecheck" -> append(DevicePosture.report(this))
             "ip" -> append(localNetworkInfo())
             "dns" -> if (arg.isBlank()) append("Usage: dns <hostname>") else runTask("DNS $arg") { dnsLookup(arg) }
             "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
