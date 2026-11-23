@@ -3,214 +3,343 @@ package com.ultrahacker.app
 import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
+import android.graphics.Typeface
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.text.InputType
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
-import java.net.InetAddress
-import java.net.NetworkInterface
+import android.widget.*
+import java.net.*
+import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
-    private val backgroundColor = Color.rgb(5, 10, 8)
-    private val panelColor = Color.rgb(12, 22, 17)
-    private val neonColor = Color.rgb(0, 255, 120)
-    private val mutedColor = Color.rgb(150, 180, 160)
-
-    private lateinit var output: TextView
-    private lateinit var commandInput: EditText
-    private lateinit var outputScroll: ScrollView
+    private val bg = Color.rgb(5, 9, 13)
+    private val panel = Color.rgb(13, 21, 29)
+    private val neon = Color.rgb(0, 245, 145)
+    private val cyan = Color.rgb(0, 205, 220)
+    private val muted = Color.rgb(145, 165, 177)
+    private lateinit var content: LinearLayout
+    private lateinit var terminalOutput: TextView
+    private lateinit var terminalInput: EditText
+    private lateinit var terminalScroll: ScrollView
+    private var tab = "HOME"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        buildUi()
-        appendLine("ULTRA HACKER v1.0")
-        appendLine("Authorized diagnostics only. Type help.")
-        appendLine("----------------------------------------")
+        buildShell()
+        showHome()
     }
 
-    private fun buildUi() {
+    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
+    private fun label(s: String, size: Float = 14f, color: Int = Color.WHITE, bold: Boolean = false) =
+        TextView(this).apply {
+            text = s; textSize = size; setTextColor(color)
+            if (bold) setTypeface(Typeface.DEFAULT, Typeface.BOLD)
+        }
+
+    private fun buildShell() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(18, 24, 18, 18)
-            setBackgroundColor(backgroundColor)
+            setPadding(dp(16), dp(20), dp(16), dp(12))
+            setBackgroundColor(bg)
         }
-
-        val header = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val title = TextView(this).apply {
-            text = "ULTRA HACKER"
-            textSize = 24f
-            setTextColor(neonColor)
-            typeface = android.graphics.Typeface.MONOSPACE
-        }
-
-        val languageButton = Button(this).apply {
-            text = "عربي / EN"
-            setOnClickListener {
-                title.text = if (title.text.toString() == "ULTRA HACKER") {
-                    "ألترا هاكر"
-                } else {
-                    "ULTRA HACKER"
-                }
-            }
-        }
-
-        header.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        header.addView(languageButton)
+        val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        header.addView(label("ULTRA", 25f, neon, true))
+        header.addView(label(" HACKER", 25f, Color.WHITE, true))
+        header.addView(label("  /  v2.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
-
-        root.addView(TextView(this).apply {
-            text = "ETHICAL CYBERSECURITY TOOLKIT • LOCAL DIAGNOSTICS"
-            textSize = 10f
-            setTextColor(mutedColor)
-            setPadding(0, 4, 0, 18)
+        root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
+            setPadding(0, dp(4), 0, dp(14))
         })
-
-        root.addView(TextView(this).apply {
-            text = "[ NETWORK ]     [ DNS ]     [ TERMINAL ]"
-            textSize = 13f
-            setTextColor(neonColor)
-            setBackgroundColor(panelColor)
-            setPadding(12, 14, 12, 14)
+        val nav = LinearLayout(this).apply { setBackgroundColor(panel) }
+        listOf("HOME", "TOOLS", "TERMINAL").forEach { name ->
+            nav.addView(Button(this).apply {
+                text = name; textSize = 10f; setTextColor(neon)
+                setBackgroundColor(Color.TRANSPARENT)
+                setOnClickListener { tab = name; render() }
+            }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        }
+        root.addView(nav)
+        content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+        root.addView(label("AUTHORIZED TESTING ONLY • ULTRA HACKER", 9f, muted).apply {
+            gravity = Gravity.CENTER; setPadding(0, dp(10), 0, 0)
         })
-
-        output = TextView(this).apply {
-            textSize = 13f
-            setTextColor(neonColor)
-            typeface = android.graphics.Typeface.MONOSPACE
-            setPadding(12, 12, 12, 12)
-            setTextIsSelectable(true)
-        }
-
-        outputScroll = ScrollView(this).apply {
-            setBackgroundColor(panelColor)
-            addView(output)
-        }
-
-        root.addView(outputScroll, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
-        ).apply {
-            topMargin = 14
-            bottomMargin = 12
-        })
-
-        val inputRow = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        commandInput = EditText(this).apply {
-            hint = "Enter command (help)"
-            setHintTextColor(mutedColor)
-            setTextColor(Color.WHITE)
-            textSize = 14f
-            setSingleLine(true)
-            inputType = InputType.TYPE_CLASS_TEXT
-            imeOptions = EditorInfo.IME_ACTION_SEND
-            setBackgroundColor(panelColor)
-            setPadding(12, 8, 12, 8)
-            setOnEditorActionListener { _, actionId, _ ->
-                if (actionId == EditorInfo.IME_ACTION_SEND) {
-                    runCommand()
-                    true
-                } else {
-                    false
-                }
-            }
-        }
-
-        inputRow.addView(commandInput, LinearLayout.LayoutParams(
-            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-        ))
-
-        inputRow.addView(Button(this).apply {
-            text = "RUN"
-            setTextColor(neonColor)
-            setOnClickListener { runCommand() }
-        })
-
-        root.addView(inputRow)
         setContentView(root)
     }
 
-    private fun appendLine(message: String) {
-        output.append("$ $message\n")
-        outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    private fun render() {
+        content.removeAllViews()
+        when (tab) { "HOME" -> showHome(); "TOOLS" -> showTools(); else -> showTerminal() }
     }
 
-    private fun runCommand() {
-        val rawCommand = commandInput.text.toString().trim()
-        if (rawCommand.isEmpty()) return
+    private fun card(title: String, detail: String, action: () -> Unit) {
+        val box = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            setBackgroundColor(panel)
+            setOnClickListener { action() }
+        }
+        box.addView(label(title, 15f, neon, true))
+        box.addView(label(detail, 11f, muted).apply { setPadding(0, dp(4), 0, 0) })
+        content.addView(box, LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(9) })
+    }
 
-        commandInput.setText("")
-        appendLine(rawCommand)
-
-        val parts = rawCommand.split(Regex("\\s+"), limit = 2)
-        when (parts[0].lowercase(Locale.ROOT)) {
-            "help" -> {
-                appendLine("Commands: help, clear, date, whoami, ip, dns <hostname>, ping <hostname>")
-                appendLine("Run diagnostics only against systems you own or are authorized to test.")
-            }
-            "clear" -> output.text = ""
-            "date" -> appendLine(
-                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
-            )
-            "whoami" -> appendLine("ultra-hacker (Android app sandbox)")
-            "ip" -> appendLine("Local IPv4: ${getLocalIpv4()}")
-            "dns", "ping" -> {
-                val host = parts.getOrNull(1)?.trim().orEmpty()
-                if (host.isBlank() || host.any { it.isWhitespace() }) {
-                    appendLine("Usage: ${parts[0]} <hostname>")
-                    return
-                }
-
-                appendLine("Checking $host ...")
-                thread {
-                    val result = try {
-                        val address = InetAddress.getByName(host)
-                        if (parts[0].equals("dns", ignoreCase = true)) {
-                            "DNS: ${address.hostAddress ?: "No address"}"
-                        } else {
-                            val reachable = address.isReachable(3000)
-                            "Resolved: ${address.hostAddress}; reachable=$reachable"
-                        }
-                    } catch (exception: Exception) {
-                        "Error: ${exception.localizedMessage ?: "Network lookup failed"}"
-                    }
-
-                    runOnUiThread { appendLine(result) }
-                }
-            }
-            else -> appendLine("Unknown command. Type help.")
+    private fun showHome() {
+        content.addView(label("SECURITY CONSOLE", 21f, Color.WHITE, true))
+        content.addView(label("Mobile toolkit for authorized diagnostics.", 12f, muted).apply {
+            setPadding(0, dp(5), 0, dp(15))
+        })
+        val status = LinearLayout(this).apply {
+            setBackgroundColor(panel); setPadding(dp(12), dp(14), dp(12), dp(14))
+        }
+        status.addView(label("● DEVICE READY", 11f, neon, true), LinearLayout.LayoutParams(0, -2, 1f))
+        status.addView(label("ANDROID " + android.os.Build.VERSION.RELEASE, 11f, cyan, true))
+        content.addView(status)
+        content.addView(label("QUICK ACCESS", 12f, muted, true).apply {
+            setPadding(0, dp(16), 0, dp(9))
+        })
+        card("⌘  ADVANCED TERMINAL", "DNS, ping, IP, RDAP and HTTPS header commands") {
+            tab = "TERMINAL"; render()
+        }
+        card("◈  NETWORK TOOLS", "Local network details, device discovery and private port checks") {
+            tab = "TOOLS"; render()
+        }
+        card("◎  WEBSITE SECURITY", "Inspect HTTPS security headers on a site you own") {
+            tab = "TOOLS"; render()
+        }
+        card("◇  DNS & RDAP", "Resolve hostnames and retrieve public registration data") {
+            tab = "TOOLS"; render()
         }
     }
 
-    private fun getLocalIpv4(): String {
+    private fun showTools() {
+        content.addView(label("DIAGNOSTIC TOOLKIT", 20f, Color.WHITE, true))
+        content.addView(label("Only test your own devices, networks and websites.", 11f, muted).apply {
+            setPadding(0, dp(4), 0, dp(12))
+        })
+        card("LOCAL NETWORK", "Show active interfaces and local IPv4 addresses") {
+            runTask("Reading network interfaces…") { localNetworkInfo() }
+        }
+        card("DNS LOOKUP", "Resolve a domain to IP addresses") {
+            ask("DNS LOOKUP", "Hostname, e.g. example.com") { host -> runTask("Resolving $host…") { dnsLookup(host) } }
+        }
+        card("PING / REACHABILITY", "Test host reachability (ICMP may be blocked)") {
+            ask("PING", "Hostname or IP address") { host -> runTask("Testing $host…") { pingHost(host) } }
+        }
+        card("LAN DEVICE DISCOVERY", "Probe a small sample of your current private /24 subnet") {
+            runTask("Discovering local HTTP devices…") { discoverLan() }
+        }
+        card("PRIVATE PORT CHECK", "Check ports 22, 80, 443 and 8080 on a private IPv4 address") {
+            ask("PRIVATE PORT CHECK", "Private IP, e.g. 192.168.1.10") { host ->
+                runTask("Checking $host…") { checkPrivatePorts(host) }
+            }
+        }
+        card("HTTPS SECURITY HEADERS", "Review common browser security headers; no exploitation") {
+            ask("HTTPS HEADER CHECK", "Domain, e.g. example.com") { host ->
+                runTask("Inspecting HTTPS headers…") { inspectHeaders(host) }
+            }
+        }
+        card("RDAP / WHOIS", "Query public domain registration data") {
+            ask("RDAP LOOKUP", "Domain, e.g. example.com") { host ->
+                runTask("Querying RDAP…") { rdapLookup(host) }
+            }
+        }
+        card("INTERNET STATUS", "Check outbound HTTPS connectivity") {
+            runTask("Checking internet…") { internetStatus() }
+        }
+    }
+
+    private fun ask(title: String, hintText: String, action: (String) -> Unit) {
+        val input = EditText(this).apply {
+            hint = hintText; setTextColor(Color.WHITE); setHintTextColor(muted)
+            setSingleLine(true); setPadding(dp(12), dp(10), dp(12), dp(10))
+            setBackgroundColor(panel)
+        }
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(14), dp(18), dp(8))
+            addView(label(title, 17f, neon, true)); addView(input)
+        }
+        android.app.AlertDialog.Builder(this).setView(wrap)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("RUN") { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let(action) }
+            .show()
+    }
+
+    private fun runTask(message: String, task: () -> String) {
+        tab = "TERMINAL"; render(); append(message)
+        thread {
+            val result = try { task() } catch (e: Exception) {
+                "ERROR: " + (e.localizedMessage ?: e.javaClass.simpleName)
+            }
+            runOnUiThread { append(result) }
+        }
+    }
+
+    private fun showTerminal() {
+        content.addView(label("COMMAND TERMINAL", 19f, Color.WHITE, true))
+        content.addView(label("Type help to list supported commands.", 11f, muted).apply {
+            setPadding(0, dp(4), 0, dp(10))
+        })
+        terminalOutput = label("", 12f, neon).apply {
+            typeface = Typeface.MONOSPACE; setPadding(dp(10), dp(10), dp(10), dp(10))
+            setTextIsSelectable(true)
+        }
+        terminalScroll = ScrollView(this).apply { setBackgroundColor(panel); addView(terminalOutput) }
+        content.addView(terminalScroll, LinearLayout.LayoutParams(-1, 0, 1f))
+        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        terminalInput = EditText(this).apply {
+            hint = "command…"; setTextColor(Color.WHITE); setHintTextColor(muted)
+            setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT
+            imeOptions = EditorInfo.IME_ACTION_SEND; setBackgroundColor(panel)
+            setOnEditorActionListener { _, id, _ ->
+                if (id == EditorInfo.IME_ACTION_SEND) { executeCommand(); true } else false
+            }
+        }
+        row.addView(terminalInput, LinearLayout.LayoutParams(0, dp(52), 1f))
+        row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
+        content.addView(row)
+        append("ULTRA HACKER v2.0 ready.")
+        append("Authorized diagnostics only. Type help.")
+    }
+
+    private fun append(line: String) {
+        if (!::terminalOutput.isInitialized) return
+        terminalOutput.append("› $line\n")
+        if (::terminalScroll.isInitialized) terminalScroll.post { terminalScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
+
+    private fun executeCommand() {
+        val raw = terminalInput.text.toString().trim()
+        if (raw.isEmpty()) return
+        terminalInput.setText(""); append(raw)
+        val p = raw.split(Regex("\\s+"), limit = 2)
+        val arg = p.getOrNull(1)?.trim().orEmpty()
+        when (p[0].lowercase(Locale.ROOT)) {
+            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | netcheck")
+            "clear" -> terminalOutput.text = ""
+            "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
+            "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
+            "ip" -> append(localNetworkInfo())
+            "dns" -> if (arg.isBlank()) append("Usage: dns <hostname>") else runTask("DNS $arg") { dnsLookup(arg) }
+            "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
+            "rdap" -> if (arg.isBlank()) append("Usage: rdap <domain>") else runTask("RDAP $arg") { rdapLookup(arg) }
+            "headers" -> if (arg.isBlank()) append("Usage: headers <domain>") else runTask("HTTPS headers $arg") { inspectHeaders(arg) }
+            "netcheck" -> runTask("Internet status") { internetStatus() }
+            else -> append("Unknown command. Type help.")
+        }
+    }
+
+    private fun localNetworkInfo(): String {
+        val out = StringBuilder()
+        val all = NetworkInterface.getNetworkInterfaces() ?: return "No interfaces found."
+        while (all.hasMoreElements()) {
+            val ni = all.nextElement()
+            if (!ni.isUp || ni.isLoopback) continue
+            out.append("\n" + ni.name + " (" + ni.displayName + ")\n")
+            val addresses = ni.inetAddresses
+            while (addresses.hasMoreElements()) out.append("  " + addresses.nextElement().hostAddress + "\n")
+        }
+        return out.toString().ifBlank { "No active network address found." }
+    }
+
+    private fun validHost(host: String) =
+        host.length in 1..253 && host.matches(Regex("[A-Za-z0-9.-]+")) &&
+            !host.startsWith(".") && !host.endsWith(".") && !host.contains("..")
+
+    private fun dnsLookup(host: String): String {
+        require(validHost(host)) { "Enter a valid hostname." }
+        return InetAddress.getAllByName(host).joinToString("\n") { it.hostAddress }
+    }
+
+    private fun pingHost(host: String): String {
+        require(validHost(host)) { "Enter a valid hostname or IP." }
+        val address = InetAddress.getByName(host)
+        val start = System.currentTimeMillis()
+        val ok = address.isReachable(3000)
+        return "Target: " + address.hostAddress + "\nReachable: $ok\nElapsed: " +
+            (System.currentTimeMillis() - start) + " ms\nICMP may be blocked by some networks."
+    }
+
+    private fun privateIpv4(host: String): Boolean {
+        val a = InetAddress.getByName(host)
+        if (a !is Inet4Address) return false
+        val b = a.address.map { it.toInt() and 255 }
+        return b[0] == 10 || (b[0] == 172 && b[1] in 16..31) ||
+            (b[0] == 192 && b[1] == 168) || b[0] == 127
+    }
+
+    private fun checkPrivatePorts(host: String): String {
+        require(privateIpv4(host)) { "Only private IPv4 addresses are allowed." }
+        val out = StringBuilder("Private host $host\n")
+        for (port in listOf(22, 80, 443, 8080)) {
+            val open = try {
+                Socket().use { it.connect(InetSocketAddress(host, port), 650); true }
+            } catch (_: Exception) { false }
+            out.append("$port: " + if (open) "OPEN\n" else "closed / filtered\n")
+        }
+        return out.toString()
+    }
+
+    private fun discoverLan(): String {
+        val local = NetworkInterface.getNetworkInterfaces().toList()
+            .flatMap { it.inetAddresses.toList() }
+            .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
+            ?: return "No private IPv4 address found."
+        val b = local.address.map { it.toInt() and 255 }
+        val prefix = "\${b[0]}.\${b[1]}.\${b[2]}."
+        val found = mutableListOf<String>()
+        for (i in 1..30) {
+            val host = prefix + i
+            if (host == local.hostAddress) continue
+            try { Socket().use { it.connect(InetSocketAddress(host, 80), 180) }; found.add(host) }
+            catch (_: Exception) { }
+        }
+        return "Local device: " + local.hostAddress +
+            "\nHTTP responders in sampled .1-.30 range:\n" +
+            found.joinToString("\n").ifBlank { "No HTTP responders found." }
+    }
+
+    private fun inspectHeaders(domain: String): String {
+        val host = domain.removePrefix("https://").removePrefix("http://").substringBefore('/').trim()
+        require(validHost(host)) { "Enter a valid domain." }
+        val c = URL("https://$host").openConnection() as HttpURLConnection
+        c.requestMethod = "HEAD"; c.connectTimeout = 5000; c.readTimeout = 5000
         return try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val addresses = interfaces.nextElement().inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val address = addresses.nextElement()
-                    if (!address.isLoopbackAddress &&
-                        address.hostAddress?.contains(':') == false
-                    ) {
-                        return address.hostAddress ?: "Unavailable"
-                    }
-                }
-            }
-            "Unavailable"
-        } catch (_: Exception) {
-            "Unavailable"
-        }
+            c.connect()
+            val names = listOf("Strict-Transport-Security", "Content-Security-Policy",
+                "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy")
+            val out = StringBuilder("HTTPS status: \${c.responseCode}\n")
+            for (name in names) out.append("$name: " + (c.getHeaderField(name) ?: "MISSING") + "\n")
+            out.toString()
+        } finally { c.disconnect() }
+    }
+
+    private fun rdapLookup(domain: String): String {
+        val host = domain.trim().lowercase(Locale.ROOT)
+        require(validHost(host)) { "Enter a valid domain." }
+        val c = URL("https://rdap.org/domain/$host").openConnection() as HttpURLConnection
+        c.connectTimeout = 6000; c.readTimeout = 6000
+        c.setRequestProperty("Accept", "application/rdap+json")
+        return try {
+            val stream = if (c.responseCode in 200..299) c.inputStream else c.errorStream
+            val body = BufferedReader(InputStreamReader(stream)).use { it.readText() }
+            "RDAP HTTP \${c.responseCode}\n" + body.take(3000)
+        } finally { c.disconnect() }
+    }
+
+    private fun internetStatus(): String {
+        val c = URL("https://www.google.com/generate_204").openConnection() as HttpURLConnection
+        c.connectTimeout = 4000; c.readTimeout = 4000
+        return try { c.connect(); "HTTPS status: \${c.responseCode}\nConnected: \${c.responseCode in 200..399}" }
+        finally { c.disconnect() }
     }
 }
