@@ -11,8 +11,8 @@ android {
         applicationId = "com.ultrahacker.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 7
-        versionName = "5.0"
+        versionCode = 8
+        versionName = "6.0"
     }
 
     compileOptions {
@@ -23,4 +23,9 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+}
+
+
+dependencies {
+    testImplementation("junit:junit:4.13.2")
 }

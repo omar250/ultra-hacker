@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("ULTRA", 25f, neon, true))
         header.addView(label(" HACKER", 25f, Color.WHITE, true))
-        header.addView(label("  /  v4.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("  /  v6.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
         root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
@@ -210,6 +210,21 @@ class MainActivity : Activity() {
         card("PDF REPORT", "Export saved scan results and recent terminal commands") {
             runTask("Creating PDF report…") { exportPdfReport() }
         }
+
+        card("MALWARE RESEARCH LAB", "Static source-code review only; no sample is executed") {
+            askMultiline("STATIC CODE ANALYZER", "Paste source code for offline indicator review") { source ->
+                runTask("Analyzing source indicators…") { ResearchLab.analyzeSource(source) }
+            }
+        }
+        card("SAFE BEHAVIOR SIMULATOR", "Run a harmless mock sequence to study suspicious behavior indicators") {
+            runTask("Running isolated behavior simulation…") { ResearchLab.simulateBenignBehavior() }
+        }
+        card("ANDROID SECURITY BASELINE", "Review Android version, security patch and basic build posture") {
+            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }
+        }
+        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
+            runTask("Reviewing this app's permissions…") { ownPermissionReport() }
+        }
     }
 
     private fun ask(title: String, hintText: String, action: (String) -> Unit) {
@@ -225,6 +240,32 @@ class MainActivity : Activity() {
         android.app.AlertDialog.Builder(this).setView(wrap)
             .setNegativeButton("CANCEL", null)
             .setPositiveButton("RUN") { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let(action) }
+            .show()
+    }
+
+    private fun askMultiline(title: String, hintText: String, action: (String) -> Unit) {
+        val input = EditText(this).apply {
+            hint = hintText
+            setTextColor(Color.WHITE)
+            setHintTextColor(muted)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            minLines = 6
+            maxLines = 12
+            gravity = Gravity.TOP
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setBackgroundColor(panel)
+        }
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(8))
+            addView(label(title, 17f, neon, true))
+            addView(input, LinearLayout.LayoutParams(-1, dp(220)))
+        }
+        android.app.AlertDialog.Builder(this).setView(wrap)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("ANALYZE") { _, _ ->
+                input.text.toString().takeIf { it.isNotBlank() }?.let(action)
+            }
             .show()
     }
 
@@ -270,7 +311,7 @@ class MainActivity : Activity() {
         row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
         row.addView(Button(this).apply { text = "CANCEL"; setTextColor(Color.YELLOW); setOnClickListener { cancelCurrentTask() } })
         content.addView(row)
-        append("ULTRA HACKER ULTIMATE v5.0 ready.")
+        append("ULTRA HACKER ULTIMATE v6.0 ready.")
         append("Authorized diagnostics only. Type help.")
     }
 
@@ -297,10 +338,11 @@ class MainActivity : Activity() {
         val p = normalized.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
+            "help" -> append("help | clear | date | whoami | devicecheck | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
             "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
+            "devicecheck" -> append(DevicePosture.report(this))
             "ip" -> append(localNetworkInfo())
             "dns" -> if (arg.isBlank()) append("Usage: dns <hostname>") else runTask("DNS $arg") { dnsLookup(arg) }
             "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
@@ -356,6 +398,7 @@ class MainActivity : Activity() {
             "حركة البيانات", "استهلاك الشبكة" -> "traffic"
             "امسح الشاشة", "نظف الطرفية" -> "clear"
             "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"
+            "افحص أمان الهاتف", "فحص أمان الهاتف", "تقرير أمان الجهاز" -> "devicecheck"
             else -> value
         }
     }
@@ -438,6 +481,25 @@ class MainActivity : Activity() {
         activeTask?.interrupt()
         super.onDestroy()
     }
+    @Suppress("DEPRECATION")
+    private fun ownPermissionReport(): String {
+        val info = packageManager.getPackageInfo(packageName, android.content.pm.PackageManager.GET_PERMISSIONS)
+        val requested = info.requestedPermissions ?: emptyArray()
+        if (requested.isEmpty()) return "This app does not declare runtime permissions."
+        val flags = info.requestedPermissionsFlags ?: IntArray(requested.size)
+        return buildString {
+            append("PACKAGE: ").append(packageName).append("\n")
+            append("PERMISSIONS DECLARED BY THIS APP ONLY\n")
+            requested.forEachIndexed { index, permission ->
+                val granted = index < flags.size &&
+                    (flags[index] and android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0
+                append(if (granted) "[GRANTED] " else "[NOT GRANTED] ")
+                    .append(permission).append("\n")
+            }
+            append("\nThis report does not inspect other apps or bypass Android permission controls.")
+        }
+    }
+
     private fun localNetworkInfo(): String {
         val out = StringBuilder()
         val all = NetworkInterface.getNetworkInterfaces() ?: return "No interfaces found."
@@ -728,7 +790,7 @@ class MainActivity : Activity() {
                 y += if (bold) 28f else 15f
             }
         }
-        line("ULTRA HACKER ULTIMATE 5.0 SECURITY REPORT", true)
+        line("ULTRA HACKER ULTIMATE 6.0 SECURITY REPORT", true)
         line("Generated: " + Date().toString())
         line("For authorized diagnostic use only.")
         y += 12f
