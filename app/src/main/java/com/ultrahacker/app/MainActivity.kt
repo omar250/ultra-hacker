@@ -2,6 +2,8 @@ package com.ultrahacker.app
 
 import android.app.Activity
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
@@ -31,6 +33,11 @@ class MainActivity : Activity() {
     private lateinit var terminalInput: EditText
     private lateinit var terminalScroll: ScrollView
     private var tab = "HOME"
+    private val stopHandler = Handler(Looper.getMainLooper())
+    @Volatile private var activeTask: Thread? = null
+    @Volatile private var stopping = false
+    private var autoStopRunnable: Runnable? = null
+    private var autoStopAtMillis: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,6 +122,8 @@ class MainActivity : Activity() {
         content.addView(label("QUICK ACCESS", 12f, muted, true).apply {
             setPadding(0, dp(16), 0, dp(9))
         })
+        card("⏱  AUTO STOP", autoStopDescription()) { showAutoStopDialog() }
+        card("✦  SMART PHRASES", "Use Arabic or English phrases instead of command syntax") { tab = "TERMINAL"; render(); append("Try: اعرض الشبكة | افحص DNS example.com | اختبر الاتصال example.com | أوقف التطبيق بعد 10 دقائق") }
         card("⌘  ADVANCED TERMINAL", "DNS, ping, IP, RDAP and HTTPS header commands") {
             tab = "TERMINAL"; render()
         }
@@ -211,14 +220,19 @@ class MainActivity : Activity() {
     }
 
     private fun runTask(message: String, task: () -> String) {
+        if (stopping) return
         tab = "TERMINAL"; render(); append(message)
-        thread {
+        activeTask?.interrupt()
+        activeTask = thread(start = true, name = "ultra-diagnostic") {
             val result = try { task() } catch (e: Exception) {
-                "ERROR: " + (e.localizedMessage ?: e.javaClass.simpleName)
+                if (Thread.currentThread().isInterrupted) "Operation cancelled." else
+                    "ERROR: " + (e.localizedMessage ?: e.javaClass.simpleName)
             }
             runOnUiThread {
-                saveScanResult(message, result)
-                append(result)
+                if (!isFinishing && !stopping) {
+                    saveScanResult(message, result)
+                    append(result)
+                }
             }
         }
     }
@@ -236,7 +250,7 @@ class MainActivity : Activity() {
         content.addView(terminalScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         terminalInput = EditText(this).apply {
-            hint = "command…"; setTextColor(Color.WHITE); setHintTextColor(muted)
+            hint = "اكتب مصطلحاً أو أمراً…"; setTextColor(Color.WHITE); setHintTextColor(muted)
             setSingleLine(true); inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEND; setBackgroundColor(panel)
             setOnEditorActionListener { _, id, _ ->
@@ -259,18 +273,28 @@ class MainActivity : Activity() {
     private fun executeCommand() {
         val raw = terminalInput.text.toString().trim()
         if (raw.isEmpty()) return
-        terminalInput.setText(""); append(raw)
+        terminalInput.setText("")
+        val normalized = normalizePhrase(raw)
+        append(if (normalized == raw) raw else raw + "  →  " + normalized)
         saveTerminalCommand(raw)
-        val p = raw.split(Regex("\\s+"), limit = 2)
+        if (normalized.startsWith("autostop ")) {
+            val minutes = normalized.substringAfter("autostop ").toLongOrNull()
+            if (minutes == null || minutes !in 1..1440) append("استخدم: أوقف التطبيق بعد 10 دقائق (من 1 إلى 1440).")
+            else scheduleAutoStop(minutes)
+            return
+        }
+        if (normalized == "stopcancel") { cancelAutoStop(); append("تم إلغاء الإيقاف التلقائي."); return }
+        val p = normalized.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck")
+            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
             "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
             "ip" -> append(localNetworkInfo())
             "dns" -> if (arg.isBlank()) append("Usage: dns <hostname>") else runTask("DNS $arg") { dnsLookup(arg) }
             "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
+            "ports" -> if (arg.isBlank()) append("Usage: ports <private-ip>") else runTask("PRIVATE PORT CHECK $arg") { checkPrivatePorts(arg) }
             "rdap" -> if (arg.isBlank()) append("Usage: rdap <domain>") else runTask("RDAP $arg") { rdapLookup(arg) }
             "headers" -> if (arg.isBlank()) append("Usage: headers <domain>") else runTask("HTTPS headers $arg") { inspectHeaders(arg) }
             "ssl" -> if (arg.isBlank()) append("Usage: ssl <hostname>") else runTask("SSL certificate") { sslCertificate(arg) }
@@ -283,10 +307,88 @@ class MainActivity : Activity() {
             "history" -> append(terminalHistory())
             "report" -> append(exportPdfReport())
             "netcheck" -> runTask("Internet status") { internetStatus() }
-            else -> append("Unknown command. Type help.")
+            "autostop" -> { val minutes = arg.toLongOrNull(); if (minutes == null || minutes !in 1..1440) append("Usage: autostop <1..1440 minutes>") else scheduleAutoStop(minutes) }
+            "stopcancel" -> { cancelAutoStop(); append("Automatic stop cancelled.") }
+            else -> append("Unknown phrase or command. Type help.")
         }
     }
 
+    private fun normalizePhrase(input: String): String {
+        val value = input.trim().replace(Regex("""\s+"""), " ")
+        val lower = value.lowercase(Locale.ROOT)
+        val patterns = listOf(
+            Regex("""^(?:افحص dns|تحقق من dns|اعرف dns)\s+(.+)$""", RegexOption.IGNORE_CASE) to "dns",
+            Regex("""^(?:اختبر الاتصال|افحص الاتصال|تحقق من الوصول)\s+(.+)$""", RegexOption.IGNORE_CASE) to "ping",
+            Regex("""^(?:افحص الموقع|افحص ترويسات الموقع|تحقق من حماية الموقع)\s+(.+)$""", RegexOption.IGNORE_CASE) to "headers",
+            Regex("""^(?:شهادة الموقع|افحص شهادة ssl|تحقق من الشهادة)\s+(.+)$""", RegexOption.IGNORE_CASE) to "ssl",
+            Regex("""^(?:بيانات النطاق|معلومات النطاق|rdap)\s+(.+)$""", RegexOption.IGNORE_CASE) to "rdap",
+            Regex("""^(?:افحص منافذ الجهاز الخاص|افحص المنافذ الخاصة)\s+(.+)$""", RegexOption.IGNORE_CASE) to "ports",
+            Regex("""^(?:حلل الرابط|افحص استجابة الرابط)\s+(.+)$""", RegexOption.IGNORE_CASE) to "http",
+            Regex("""^(?:احسب بصمة sha ?256|بصمة sha ?256)\s+(.+)$""", RegexOption.IGNORE_CASE) to "sha256",
+            Regex("""^(?:شفّر base64|ترميز base64)\s+(.+)$""", RegexOption.IGNORE_CASE) to "b64encode",
+            Regex("""^(?:فك base64|فك ترميز base64)\s+(.+)$""", RegexOption.IGNORE_CASE) to "b64decode",
+            Regex("""^(?:أوقف التطبيق بعد|اوقف التطبيق بعد|إيقاف تلقائي بعد)\s+(\d+)\s*(?:دقيقة|دقائق|min|minutes?)$""", RegexOption.IGNORE_CASE) to "autostop"
+        )
+        for ((regex, command) in patterns) {
+            val match = regex.matchEntire(value)
+            if (match != null) return command + " " + match.groupValues[1].trim()
+        }
+        return when (lower) {
+            "اعرض الشبكة", "معلومات الشبكة", "عنوان ip", "اعرض ip", "الشبكة المحلية" -> "ip"
+            "افحص الانترنت", "افحص الإنترنت", "تحقق من الانترنت", "حالة الانترنت", "حالة الإنترنت" -> "netcheck"
+            "أنشئ كلمة مرور", "انشئ كلمة مرور", "ولّد كلمة مرور", "ولد كلمة مرور" -> "passgen"
+            "اعرض السجل", "سجل الفحوصات", "التاريخ" -> "history"
+            "أنشئ تقرير", "انشئ تقرير", "تقرير pdf", "تصدير التقرير" -> "report"
+            "حركة البيانات", "استهلاك الشبكة" -> "traffic"
+            "امسح الشاشة", "نظف الطرفية" -> "clear"
+            "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"
+            else -> value
+        }
+    }
+
+    private fun autoStopDescription(): String = if (autoStopAtMillis > 0L) {
+        val remaining = ((autoStopAtMillis - System.currentTimeMillis()).coerceAtLeast(0L) / 60000L) + 1L
+        "Scheduled to close in about " + remaining + " minute(s). Tap to change or cancel."
+    } else "Choose a countdown to stop active work and close the app automatically."
+
+    private fun showAutoStopDialog() {
+        val options = arrayOf("إيقاف بعد 5 دقائق", "إيقاف بعد 10 دقائق", "إيقاف بعد 15 دقيقة", "إيقاف بعد 30 دقيقة", "إيقاف بعد ساعة", "إيقاف بعد ساعتين", "إلغاء الإيقاف التلقائي")
+        val minutes = listOf(5L, 10L, 15L, 30L, 60L, 120L)
+        android.app.AlertDialog.Builder(this).setTitle("الإيقاف التلقائي")
+            .setItems(options) { _, which ->
+                if (which == options.lastIndex) { cancelAutoStop(); Toast.makeText(this, "تم إلغاء المؤقت", Toast.LENGTH_SHORT).show() }
+                else scheduleAutoStop(minutes[which])
+            }.setNegativeButton("إغلاق", null).show()
+    }
+
+    private fun scheduleAutoStop(minutes: Long) {
+        require(minutes in 1..1440) { "Choose 1 to 1440 minutes." }
+        cancelAutoStop()
+        stopping = false
+        autoStopAtMillis = System.currentTimeMillis() + minutes * 60_000L
+        val task = Runnable {
+            stopping = true
+            activeTask?.interrupt()
+            Toast.makeText(this, "انتهى المؤقت؛ يتم إيقاف ULTRA HACKER", Toast.LENGTH_SHORT).show()
+            finishAndRemoveTask()
+        }
+        autoStopRunnable = task
+        stopHandler.postDelayed(task, minutes * 60_000L)
+        Toast.makeText(this, "سيُغلق التطبيق بعد " + minutes + " دقيقة", Toast.LENGTH_LONG).show()
+    }
+
+    private fun cancelAutoStop() {
+        autoStopRunnable?.let { stopHandler.removeCallbacks(it) }
+        autoStopRunnable = null
+        autoStopAtMillis = 0L
+        stopping = false
+    }
+
+    override fun onDestroy() {
+        autoStopRunnable?.let { stopHandler.removeCallbacks(it) }
+        activeTask?.interrupt()
+        super.onDestroy()
+    }
     private fun localNetworkInfo(): String {
         val out = StringBuilder()
         val all = NetworkInterface.getNetworkInterfaces() ?: return "No interfaces found."
