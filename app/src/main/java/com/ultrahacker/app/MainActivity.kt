@@ -4,6 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.pdf.PdfDocument
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.text.InputType
@@ -12,6 +13,8 @@ import java.net.*
 import javax.net.ssl.HttpsURLConnection
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -51,7 +54,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("ULTRA", 25f, neon, true))
         header.addView(label(" HACKER", 25f, Color.WHITE, true))
-        header.addView(label("  /  v2.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("  /  v3.5", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
         root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
@@ -183,6 +186,12 @@ class MainActivity : Activity() {
         card("NETWORK TRAFFIC", "Read this app's received and transmitted byte counters") {
             runTask("Reading app traffic counters…") { trafficStats() }
         }
+        card("SCAN HISTORY", "Review the latest saved diagnostic results") {
+            showScanHistory()
+        }
+        card("PDF REPORT", "Export saved scan results and recent terminal commands") {
+            runTask("Creating PDF report…") { exportPdfReport() }
+        }
     }
 
     private fun ask(title: String, hintText: String, action: (String) -> Unit) {
@@ -207,7 +216,10 @@ class MainActivity : Activity() {
             val result = try { task() } catch (e: Exception) {
                 "ERROR: " + (e.localizedMessage ?: e.javaClass.simpleName)
             }
-            runOnUiThread { append(result) }
+            runOnUiThread {
+                saveScanResult(message, result)
+                append(result)
+            }
         }
     }
 
@@ -234,7 +246,7 @@ class MainActivity : Activity() {
         row.addView(terminalInput, LinearLayout.LayoutParams(0, dp(52), 1f))
         row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
         content.addView(row)
-        append("ULTRA HACKER v2.0 ready.")
+        append("ULTRA HACKER v3.5 ready.")
         append("Authorized diagnostics only. Type help.")
     }
 
@@ -248,10 +260,11 @@ class MainActivity : Activity() {
         val raw = terminalInput.text.toString().trim()
         if (raw.isEmpty()) return
         terminalInput.setText(""); append(raw)
+        saveTerminalCommand(raw)
         val p = raw.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | netcheck")
+            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
             "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
@@ -267,6 +280,8 @@ class MainActivity : Activity() {
             "b64decode" -> if (arg.isBlank()) append("Usage: b64decode <base64>") else append(base64Decode(arg))
             "traffic" -> append(trafficStats())
             "passgen" -> append(generatePassword(20))
+            "history" -> append(terminalHistory())
+            "report" -> append(exportPdfReport())
             "netcheck" -> runTask("Internet status") { internetStatus() }
             else -> append("Unknown command. Type help.")
         }
@@ -445,6 +460,121 @@ class MainActivity : Activity() {
             String.format(Locale.US, "%.2f MB (%d bytes)", bytes / 1048576.0, bytes)
         return "App UID: " + uid + "\nReceived: " + format(rx) + "\nTransmitted: " + format(tx) +
             "\nNote: Android reports cumulative app traffic since boot."
+    }
+
+    private fun prefs() = getSharedPreferences("ultra_hacker_v35", MODE_PRIVATE)
+
+    private fun saveScanResult(title: String, result: String) {
+        val old = prefs().getString("scan_history", "").orEmpty()
+        val encoded = android.util.Base64.encodeToString(
+            (title + "\n" + result).toByteArray(Charsets.UTF_8),
+            android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE
+        )
+        val rows = (listOf(System.currentTimeMillis().toString() + "|" + encoded) +
+            old.lines().filter { it.contains("|") }).take(50)
+        prefs().edit().putString("scan_history", rows.joinToString("\n")).apply()
+    }
+
+    private fun scanHistoryEntries(): List<Pair<Long, String>> =
+        prefs().getString("scan_history", "").orEmpty().lines().mapNotNull { line ->
+            val parts = line.split("|", limit = 2)
+            if (parts.size != 2) null else try {
+                val timestamp = parts[0].toLong()
+                val decoded = String(
+                    android.util.Base64.decode(parts[1], android.util.Base64.NO_WRAP or android.util.Base64.URL_SAFE),
+                    Charsets.UTF_8
+                )
+                timestamp to decoded
+            } catch (_: Exception) { null }
+        }
+
+    private fun showScanHistory() {
+        tab = "TERMINAL"
+        render()
+        append("SAVED SCAN HISTORY (latest 50)")
+        val entries = scanHistoryEntries()
+        if (entries.isEmpty()) {
+            append("No saved scans yet. Run a tool first.")
+            return
+        }
+        entries.take(20).forEach { (time, detail) ->
+            val stamp = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(time))
+            append("[$stamp] $detail")
+        }
+    }
+
+    private fun saveTerminalCommand(command: String) {
+        val old = prefs().getString("terminal_history", "").orEmpty().lines().filter { it.isNotBlank() }
+        prefs().edit().putString("terminal_history", (old + command).takeLast(100).joinToString("\n")).apply()
+    }
+
+    private fun terminalHistory(): String {
+        val entries = prefs().getString("terminal_history", "").orEmpty().lines().filter { it.isNotBlank() }
+        return if (entries.isEmpty()) "No terminal commands saved."
+        else "RECENT TERMINAL COMMANDS\n" + entries.takeLast(30).joinToString("\n")
+    }
+
+    private fun exportPdfReport(): String {
+        val scans = scanHistoryEntries()
+        val commands = prefs().getString("terminal_history", "").orEmpty().lines().filter { it.isNotBlank() }.takeLast(30)
+        val document = PdfDocument()
+        val pageWidth = 595
+        val pageHeight = 842
+        val paint = android.graphics.Paint().apply {
+            color = android.graphics.Color.BLACK
+            textSize = 10f
+            isAntiAlias = true
+        }
+        val titlePaint = android.graphics.Paint(paint).apply {
+            textSize = 18f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
+        var pageNumber = 1
+        var page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+        var canvas = page.canvas
+        var y = 42f
+        fun newPage() {
+            document.finishPage(page)
+            pageNumber++
+            page = document.startPage(PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create())
+            canvas = page.canvas
+            y = 42f
+        }
+        fun line(text: String, bold: Boolean = false) {
+            val p = if (bold) titlePaint else paint
+            val maxChars = if (bold) 42 else 88
+            text.chunked(maxChars).forEach { chunk ->
+                if (y > pageHeight - 45) newPage()
+                canvas.drawText(chunk, 36f, y, p)
+                y += if (bold) 28f else 15f
+            }
+        }
+        line("ULTRA HACKER 3.5 SECURITY REPORT", true)
+        line("Generated: " + Date().toString())
+        line("For authorized diagnostic use only.")
+        y += 12f
+        line("SAVED SCAN RESULTS", true)
+        if (scans.isEmpty()) line("No scan results have been saved.")
+        scans.forEach { (time, detail) ->
+            line(SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(time)))
+            detail.lines().take(12).forEach { line(it.take(160)) }
+            y += 8f
+        }
+        y += 12f
+        line("RECENT TERMINAL COMMANDS", true)
+        if (commands.isEmpty()) line("No commands have been saved.")
+        commands.forEach { line(it) }
+        document.finishPage(page)
+        val dir = getExternalFilesDir(android.os.Environment.DIRECTORY_DOCUMENTS) ?: filesDir
+        if (!dir.exists()) dir.mkdirs()
+        val file = File(dir, "ultra-hacker-report-" + System.currentTimeMillis() + ".pdf")
+        try {
+            FileOutputStream(file).use { document.writeTo(it) }
+        } finally {
+            document.close()
+        }
+        return "PDF report created successfully.\nSaved to: " + file.absolutePath +
+            "\nScans included: " + scans.size + "\nTerminal commands included: " + commands.size
     }
 
 }
