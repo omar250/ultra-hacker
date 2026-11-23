@@ -210,6 +210,18 @@ class MainActivity : Activity() {
         card("PDF REPORT", "Export saved scan results and recent terminal commands") {
             runTask("Creating PDF report…") { exportPdfReport() }
         }
+
+        card("MALWARE RESEARCH LAB", "Static source-code review only; no sample is executed") {
+            askMultiline("STATIC CODE ANALYZER", "Paste source code for offline indicator review") { source ->
+                runTask("Analyzing source indicators…") { ResearchLab.analyzeSource(source) }
+            }
+        }
+        card("SAFE BEHAVIOR SIMULATOR", "Run a harmless mock sequence to study suspicious behavior indicators") {
+            runTask("Running isolated behavior simulation…") { ResearchLab.simulateBenignBehavior() }
+        }
+        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
+            runTask("Reviewing this app's permissions…") { ownPermissionReport() }
+        }
     }
 
     private fun ask(title: String, hintText: String, action: (String) -> Unit) {
@@ -225,6 +237,32 @@ class MainActivity : Activity() {
         android.app.AlertDialog.Builder(this).setView(wrap)
             .setNegativeButton("CANCEL", null)
             .setPositiveButton("RUN") { _, _ -> input.text.toString().trim().takeIf { it.isNotEmpty() }?.let(action) }
+            .show()
+    }
+
+    private fun askMultiline(title: String, hintText: String, action: (String) -> Unit) {
+        val input = EditText(this).apply {
+            hint = hintText
+            setTextColor(Color.WHITE)
+            setHintTextColor(muted)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            minLines = 6
+            maxLines = 12
+            gravity = Gravity.TOP
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setBackgroundColor(panel)
+        }
+        val wrap = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(14), dp(18), dp(8))
+            addView(label(title, 17f, neon, true))
+            addView(input, LinearLayout.LayoutParams(-1, dp(220)))
+        }
+        android.app.AlertDialog.Builder(this).setView(wrap)
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("ANALYZE") { _, _ ->
+                input.text.toString().takeIf { it.isNotBlank() }?.let(action)
+            }
             .show()
     }
 
@@ -438,6 +476,25 @@ class MainActivity : Activity() {
         activeTask?.interrupt()
         super.onDestroy()
     }
+    @Suppress("DEPRECATION")
+    private fun ownPermissionReport(): String {
+        val info = packageManager.getPackageInfo(packageName, android.content.pm.PackageManager.GET_PERMISSIONS)
+        val requested = info.requestedPermissions ?: emptyArray()
+        if (requested.isEmpty()) return "This app does not declare runtime permissions."
+        val flags = info.requestedPermissionsFlags ?: IntArray(requested.size)
+        return buildString {
+            append("PACKAGE: ").append(packageName).append("\n")
+            append("PERMISSIONS DECLARED BY THIS APP ONLY\n")
+            requested.forEachIndexed { index, permission ->
+                val granted = index < flags.size &&
+                    (flags[index] and android.content.pm.PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0
+                append(if (granted) "[GRANTED] " else "[NOT GRANTED] ")
+                    .append(permission).append("\n")
+            }
+            append("\nThis report does not inspect other apps or bypass Android permission controls.")
+        }
+    }
+
     private fun localNetworkInfo(): String {
         val out = StringBuilder()
         val all = NetworkInterface.getNetworkInterfaces() ?: return "No interfaces found."
