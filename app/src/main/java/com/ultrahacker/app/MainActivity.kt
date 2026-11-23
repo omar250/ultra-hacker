@@ -61,7 +61,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("ULTRA", 25f, neon, true))
         header.addView(label(" HACKER", 25f, Color.WHITE, true))
-        header.addView(label("  /  v3.5", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("  /  v3.6", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
         root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
@@ -260,7 +260,7 @@ class MainActivity : Activity() {
         row.addView(terminalInput, LinearLayout.LayoutParams(0, dp(52), 1f))
         row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
         content.addView(row)
-        append("ULTRA HACKER v3.5 ready.")
+        append("ULTRA HACKER v3.6 ready.")
         append("Authorized diagnostics only. Type help.")
     }
 
@@ -651,7 +651,7 @@ class MainActivity : Activity() {
                 y += if (bold) 28f else 15f
             }
         }
-        line("ULTRA HACKER 3.5 SECURITY REPORT", true)
+        line("ULTRA HACKER 3.6 SECURITY REPORT", true)
         line("Generated: " + Date().toString())
         line("For authorized diagnostic use only.")
         y += 12f
