@@ -13,6 +13,10 @@ Native Android toolkit for authorized cybersecurity learning, troubleshooting an
 - Per-app cumulative network traffic counters.
 - Persistent local scan history and terminal command history.
 - PDF report export.
+- Static malware-research source analyzer: hashes submitted source and flags selected risky API indicators by line number; source is never compiled or executed.
+- Harmless behavior simulator using fixed mock events only; it does not modify files, request permissions or send network traffic.
+- Permission monitor limited to permissions declared and granted by this app; it does not inspect other installed apps.
+
 - Arabic/English smart phrases mapped to a fixed allowlist of diagnostic actions. No arbitrary shell execution or remote command execution.
 - Automatic stop timer (1–1440 minutes), persisted across Activity recreation, with cancellation.
 - Active diagnostic task cancellation from the terminal CANCEL button or the `cancel` command.
@@ -34,6 +38,9 @@ Native Android toolkit for authorized cybersecurity learning, troubleshooting an
 - Network checks are intended for devices, networks and websites you own or are explicitly authorized to assess.
 - Port checks are restricted to private IPv4 targets and a small fixed port list.
 - URL review is heuristic only and cannot guarantee a site is safe.
+- Malware research features are static/offline analysis and harmless simulation only. No payload execution, persistence, credential access, evasion or propagation is implemented.
+- The current project is a native Android app. A browser-based dashboard and AI-provider integration require a separate web/backend implementation and are not included in this Android build.
+
 - Auto-stop requests Android to close the app and interrupts the active task; Android may still control process lifecycle.
 - ICMP reachability may be blocked by the network.
 - Traffic counters are cumulative UID counters since boot, not live throughput.
