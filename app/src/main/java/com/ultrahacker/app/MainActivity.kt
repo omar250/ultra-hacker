@@ -43,6 +43,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         buildShell()
         showHome()
+        restoreAutoStop()
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
@@ -267,8 +268,9 @@ class MainActivity : Activity() {
         }
         row.addView(terminalInput, LinearLayout.LayoutParams(0, dp(52), 1f))
         row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
+        row.addView(Button(this).apply { text = "CANCEL"; setTextColor(Color.YELLOW); setOnClickListener { cancelCurrentTask() } })
         content.addView(row)
-        append("ULTRA HACKER v3.6 ready.")
+        append("ULTRA HACKER ULTIMATE v5.0 ready.")
         append("Authorized diagnostics only. Type help.")
     }
 
@@ -318,6 +320,8 @@ class MainActivity : Activity() {
             "netcheck" -> runTask("Internet status") { internetStatus() }
             "autostop" -> { val minutes = arg.toLongOrNull(); if (minutes == null || minutes !in 1..1440) append("Usage: autostop <1..1440 minutes>") else scheduleAutoStop(minutes) }
             "stopcancel" -> { cancelAutoStop(); append("Automatic stop cancelled.") }
+            "cancel" -> cancelCurrentTask()
+            "stopnow", "exit" -> { cancelCurrentTask(); cancelAutoStop(); stopping = true; finishAndRemoveTask() }
             else -> append("Unknown phrase or command. Type help.")
         }
     }
@@ -371,13 +375,38 @@ class MainActivity : Activity() {
             }.setNegativeButton("إغلاق", null).show()
     }
 
+    private fun restoreAutoStop() {
+        val deadline = prefs().getLong("auto_stop_deadline", 0L)
+        if (deadline <= 0L) return
+        val remaining = deadline - System.currentTimeMillis()
+        if (remaining <= 0L) {
+            prefs().edit().remove("auto_stop_deadline").apply()
+            stopping = true
+            activeTask?.interrupt()
+            finishAndRemoveTask()
+            return
+        }
+        autoStopAtMillis = deadline
+        val task = Runnable {
+            stopping = true
+            prefs().edit().remove("auto_stop_deadline").apply()
+            activeTask?.interrupt()
+            Toast.makeText(this, "انتهى المؤقت؛ يتم إيقاف ULTRA HACKER", Toast.LENGTH_SHORT).show()
+            finishAndRemoveTask()
+        }
+        autoStopRunnable = task
+        stopHandler.postDelayed(task, remaining)
+    }
+
     private fun scheduleAutoStop(minutes: Long) {
         require(minutes in 1..1440) { "Choose 1 to 1440 minutes." }
         cancelAutoStop()
         stopping = false
         autoStopAtMillis = System.currentTimeMillis() + minutes * 60_000L
+        prefs().edit().putLong("auto_stop_deadline", autoStopAtMillis).apply()
         val task = Runnable {
             stopping = true
+            prefs().edit().remove("auto_stop_deadline").apply()
             activeTask?.interrupt()
             Toast.makeText(this, "انتهى المؤقت؛ يتم إيقاف ULTRA HACKER", Toast.LENGTH_SHORT).show()
             finishAndRemoveTask()
@@ -387,10 +416,20 @@ class MainActivity : Activity() {
         Toast.makeText(this, "سيُغلق التطبيق بعد " + minutes + " دقيقة", Toast.LENGTH_LONG).show()
     }
 
+    private fun cancelCurrentTask() {
+        val task = activeTask
+        if (task != null && task.isAlive) {
+            task.interrupt()
+            activeTask = null
+            append("Cancellation requested for the active diagnostic task.")
+        } else append("No active task to cancel.")
+    }
+
     private fun cancelAutoStop() {
         autoStopRunnable?.let { stopHandler.removeCallbacks(it) }
         autoStopRunnable = null
         autoStopAtMillis = 0L
+        prefs().edit().remove("auto_stop_deadline").apply()
         stopping = false
     }
 
@@ -689,7 +728,7 @@ class MainActivity : Activity() {
                 y += if (bold) 28f else 15f
             }
         }
-        line("ULTRA HACKER 4.0 SECURITY REPORT", true)
+        line("ULTRA HACKER ULTIMATE 5.0 SECURITY REPORT", true)
         line("Generated: " + Date().toString())
         line("For authorized diagnostic use only.")
         y += 12f
