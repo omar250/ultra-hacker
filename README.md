@@ -1,4 +1,4 @@
-# ULTRA HACKER 3.5
+# ULTRA HACKER 3.6
 
 Native Android toolkit for authorized cybersecurity learning and diagnostics.
 
@@ -12,10 +12,20 @@ Native Android toolkit for authorized cybersecurity learning and diagnostics.
 - Per-app cumulative network traffic counters
 - Local scan history (up to 50 results) and terminal command history (up to 100 commands)
 - PDF export of saved scan results and recent terminal commands
-- Terminal commands: help, clear, date, whoami, ip, dns, ping, rdap, headers, ssl, http, sha256, b64encode, b64decode, traffic, passgen, history, report, netcheck
+- Arabic/English smart phrases mapped to a fixed set of reviewed diagnostic actions (no arbitrary shell execution)
+- Automatic stop countdown: closes the app and interrupts the active diagnostic task after 5, 10, 15, 30, 60 or 120 minutes; can be cancelled
+- Terminal commands: help, clear, date, whoami, ip, dns, ping, ports, rdap, headers, ssl, http, sha256, b64encode, b64decode, traffic, passgen, history, report, netcheck, autostop, stopcancel
+
+## Smart phrase examples
+- `اعرض الشبكة` → `ip`
+- `افحص DNS example.com` → `dns example.com`
+- `اختبر الاتصال example.com` → `ping example.com`
+- `افحص الموقع example.com` → `headers example.com`
+- `أوقف التطبيق بعد 10 دقائق` → schedule automatic stop
+- `أوقف الإيقاف التلقائي` → cancel the timer
 
 ## Build
-Push to main or manually run **Build Android APK** in GitHub Actions. Download the artifact named `ultra-hacker-v3-debug-apk`.
+Push to main or manually run **Build Android APK** in GitHub Actions. Download the artifact named `ultra-hacker-v3.6-debug-apk`.
 
 ## Notes
 - The app is not a root shell or full Linux terminal.
