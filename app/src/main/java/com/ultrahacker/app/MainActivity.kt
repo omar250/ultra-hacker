@@ -62,7 +62,7 @@ class MainActivity : Activity() {
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         header.addView(label("ULTRA", 25f, neon, true))
         header.addView(label(" HACKER", 25f, Color.WHITE, true))
-        header.addView(label("  /  v4.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(label("  /  v6.0", 11f, cyan), LinearLayout.LayoutParams(0, -2, 1f))
         header.addView(label("● READY", 10f, neon, true))
         root.addView(header)
         root.addView(label("ETHICAL SECURITY • NETWORK INTELLIGENCE", 10f, muted).apply {
@@ -219,7 +219,7 @@ class MainActivity : Activity() {
         card("SAFE BEHAVIOR SIMULATOR", "Run a harmless mock sequence to study suspicious behavior indicators") {
             runTask("Running isolated behavior simulation…") { ResearchLab.simulateBenignBehavior() }
         }
-        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
+        card("ANDROID SECURITY BASELINE", "Review Android version, security patch and basic build posture") {\n            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }\n        }\n        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
             runTask("Reviewing this app's permissions…") { ownPermissionReport() }
         }
     }
@@ -308,7 +308,7 @@ class MainActivity : Activity() {
         row.addView(Button(this).apply { text = "RUN"; setTextColor(neon); setOnClickListener { executeCommand() } })
         row.addView(Button(this).apply { text = "CANCEL"; setTextColor(Color.YELLOW); setOnClickListener { cancelCurrentTask() } })
         content.addView(row)
-        append("ULTRA HACKER ULTIMATE v5.0 ready.")
+        append("ULTRA HACKER ULTIMATE v6.0 ready.")
         append("Authorized diagnostics only. Type help.")
     }
 
@@ -335,10 +335,10 @@ class MainActivity : Activity() {
         val p = normalized.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
+            "help" -> append("help | clear | date | whoami | devicecheck | ip | dns <host> | ping <host> | ports <private-ip> | rdap <domain> | headers <domain> | ssl <host> | http <url> | urlcheck <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | history | report | netcheck | autostop <minutes> | stopcancel")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
-            "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
+            "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")\n            "devicecheck" -> append(DevicePosture.report(this))
             "ip" -> append(localNetworkInfo())
             "dns" -> if (arg.isBlank()) append("Usage: dns <hostname>") else runTask("DNS $arg") { dnsLookup(arg) }
             "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
@@ -393,7 +393,7 @@ class MainActivity : Activity() {
             "أنشئ تقرير", "انشئ تقرير", "تقرير pdf", "تصدير التقرير" -> "report"
             "حركة البيانات", "استهلاك الشبكة" -> "traffic"
             "امسح الشاشة", "نظف الطرفية" -> "clear"
-            "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"
+            "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"\n            "افحص أمان الهاتف", "فحص أمان الهاتف", "تقرير أمان الجهاز" -> "devicecheck"
             else -> value
         }
     }
@@ -785,7 +785,7 @@ class MainActivity : Activity() {
                 y += if (bold) 28f else 15f
             }
         }
-        line("ULTRA HACKER ULTIMATE 5.0 SECURITY REPORT", true)
+        line("ULTRA HACKER ULTIMATE 6.0 SECURITY REPORT", true)
         line("Generated: " + Date().toString())
         line("For authorized diagnostic use only.")
         y += 12f
