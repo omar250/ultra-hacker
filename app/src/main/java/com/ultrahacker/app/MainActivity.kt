@@ -156,6 +156,28 @@ class MainActivity : Activity() {
         card("INTERNET STATUS", "Check outbound HTTPS connectivity") {
             runTask("Checking internet…") { internetStatus() }
         }
+        card("SSL / TLS CERTIFICATE", "Inspect certificate issuer, validity dates and hostname connection") {
+            ask("SSL CERTIFICATE", "Domain, e.g. example.com") { host ->
+                runTask("Inspecting TLS certificate…") { sslCertificate(host) }
+            }
+        }
+        card("HTTP RESPONSE ANALYZER", "Check status code, content type and redirect behavior") {
+            ask("HTTP ANALYZER", "HTTPS URL, e.g. https://example.com") { url ->
+                runTask("Checking HTTP response…") { httpAnalysis(url) }
+            }
+        }
+        card("SHA-256 HASH", "Generate a SHA-256 digest from text") {
+            ask("SHA-256", "Enter text to hash") { value -> runTask("Generating SHA-256…") { sha256(value) } }
+        }
+        card("BASE64 TOOL", "Encode text to Base64") {
+            ask("BASE64 ENCODE", "Enter text") { value -> runTask("Encoding Base64…") { base64Encode(value) } }
+        }
+        card("PASSWORD GENERATOR", "Generate a random 20-character password locally") {
+            runTask("Generating secure password…") { generatePassword(20) }
+        }
+        card("NETWORK TRAFFIC", "Read this app's received and transmitted byte counters") {
+            runTask("Reading app traffic counters…") { trafficStats() }
+        }
     }
 
     private fun ask(title: String, hintText: String, action: (String) -> Unit) {
@@ -224,7 +246,7 @@ class MainActivity : Activity() {
         val p = raw.split(Regex("\\s+"), limit = 2)
         val arg = p.getOrNull(1)?.trim().orEmpty()
         when (p[0].lowercase(Locale.ROOT)) {
-            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | netcheck")
+            "help" -> append("help | clear | date | whoami | ip | dns <host> | ping <host> | rdap <domain> | headers <domain> | ssl <host> | http <url> | sha256 <text> | b64encode <text> | b64decode <text> | traffic | passgen | netcheck")
             "clear" -> terminalOutput.text = ""
             "date" -> append(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
             "whoami" -> append("ULTRA HACKER Android sandbox; no root access.")
@@ -233,6 +255,13 @@ class MainActivity : Activity() {
             "ping" -> if (arg.isBlank()) append("Usage: ping <hostname>") else runTask("PING $arg") { pingHost(arg) }
             "rdap" -> if (arg.isBlank()) append("Usage: rdap <domain>") else runTask("RDAP $arg") { rdapLookup(arg) }
             "headers" -> if (arg.isBlank()) append("Usage: headers <domain>") else runTask("HTTPS headers $arg") { inspectHeaders(arg) }
+            "ssl" -> if (arg.isBlank()) append("Usage: ssl <hostname>") else runTask("SSL certificate") { sslCertificate(arg) }
+            "http" -> if (arg.isBlank()) append("Usage: http <https-url>") else runTask("HTTP analysis") { httpAnalysis(arg) }
+            "sha256" -> if (arg.isBlank()) append("Usage: sha256 <text>") else append(sha256(arg))
+            "b64encode" -> if (arg.isBlank()) append("Usage: b64encode <text>") else append(base64Encode(arg))
+            "b64decode" -> if (arg.isBlank()) append("Usage: b64decode <base64>") else append(base64Decode(arg))
+            "traffic" -> append(trafficStats())
+            "passgen" -> append(generatePassword(20))
             "netcheck" -> runTask("Internet status") { internetStatus() }
             else -> append("Unknown command. Type help.")
         }
@@ -295,7 +324,7 @@ class MainActivity : Activity() {
             .firstOrNull { it is Inet4Address && it.isSiteLocalAddress }
             ?: return "No private IPv4 address found."
         val b = local.address.map { it.toInt() and 255 }
-        val prefix = "\${b[0]}.\${b[1]}.\${b[2]}."
+        val prefix = "${b[0]}.${b[1]}.${b[2]}."
         val found = mutableListOf<String>()
         for (i in 1..30) {
             val host = prefix + i
@@ -317,7 +346,7 @@ class MainActivity : Activity() {
             c.connect()
             val names = listOf("Strict-Transport-Security", "Content-Security-Policy",
                 "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy")
-            val out = StringBuilder("HTTPS status: \${c.responseCode}\n")
+            val out = StringBuilder("HTTPS status: ${c.responseCode}\n")
             for (name in names) out.append("$name: " + (c.getHeaderField(name) ?: "MISSING") + "\n")
             out.toString()
         } finally { c.disconnect() }
@@ -332,14 +361,85 @@ class MainActivity : Activity() {
         return try {
             val stream = if (c.responseCode in 200..299) c.inputStream else c.errorStream
             val body = BufferedReader(InputStreamReader(stream)).use { it.readText() }
-            "RDAP HTTP \${c.responseCode}\n" + body.take(3000)
+            "RDAP HTTP ${c.responseCode}\n" + body.take(3000)
         } finally { c.disconnect() }
     }
 
     private fun internetStatus(): String {
         val c = URL("https://www.google.com/generate_204").openConnection() as HttpURLConnection
         c.connectTimeout = 4000; c.readTimeout = 4000
-        return try { c.connect(); "HTTPS status: \${c.responseCode}\nConnected: \${c.responseCode in 200..399}" }
+        return try { c.connect(); "HTTPS status: ${c.responseCode}\nConnected: ${c.responseCode in 200..399}" }
         finally { c.disconnect() }
     }
+    private fun sslCertificate(domain: String): String {
+        val host = domain.removePrefix("https://").removePrefix("http://").substringBefore('/').trim()
+        require(validHost(host)) { "Enter a valid hostname." }
+        val c = URL("https://" + host).openConnection() as HttpsURLConnection
+        c.connectTimeout = 6000
+        c.readTimeout = 6000
+        return try {
+            c.connect()
+            val cert = c.serverCertificates.firstOrNull() as? java.security.cert.X509Certificate
+                ?: return "The server did not provide an X.509 certificate."
+            val now = Date()
+            val valid = try { cert.checkValidity(now); true } catch (_: Exception) { false }
+            "TLS connection: OK\nSubject: " + cert.subjectX500Principal.name +
+                "\nIssuer: " + cert.issuerX500Principal.name +
+                "\nValid from: " + cert.notBefore +
+                "\nValid until: " + cert.notAfter +
+                "\nCurrently valid: " + valid +
+                "\nTLS protocol: " + c.sslSocketFactory.defaultCipherSuites.firstOrNull().orEmpty()
+        } finally { c.disconnect() }
+    }
+
+    private fun httpAnalysis(rawUrl: String): String {
+        val value = if (rawUrl.startsWith("https://") || rawUrl.startsWith("http://")) rawUrl else "https://" + rawUrl
+        val u = URL(value)
+        require(u.protocol == "https" || u.protocol == "http") { "Only HTTP or HTTPS URLs are supported." }
+        val c = u.openConnection() as HttpURLConnection
+        c.requestMethod = "HEAD"
+        c.connectTimeout = 6000
+        c.readTimeout = 6000
+        c.instanceFollowRedirects = false
+        return try {
+            c.connect()
+            val names = listOf("Strict-Transport-Security", "Content-Security-Policy",
+                "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Permissions-Policy")
+            val out = StringBuilder()
+            out.append("URL: ").append(value).append("\nHTTP status: ").append(c.responseCode)
+            out.append("\nContent-Type: ").append(c.contentType ?: "not provided")
+            out.append("\nRedirect: ").append(c.getHeaderField("Location") ?: "none")
+            for (name in names) out.append("\n").append(name).append(": ").append(c.getHeaderField(name) ?: "MISSING")
+            out.toString()
+        } finally { c.disconnect() }
+    }
+
+    private fun sha256(value: String): String {
+        val bytes = java.security.MessageDigest.getInstance("SHA-256").digest(value.toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun base64Encode(value: String): String =
+        android.util.Base64.encodeToString(value.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+
+    private fun base64Decode(value: String): String =
+        String(android.util.Base64.decode(value, android.util.Base64.DEFAULT), Charsets.UTF_8)
+
+    private fun generatePassword(length: Int): String {
+        require(length in 12..64) { "Password length must be between 12 and 64." }
+        val chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#%+=_-"
+        val random = java.security.SecureRandom()
+        return (1..length).map { chars[random.nextInt(chars.length)] }.joinToString("")
+    }
+
+    private fun trafficStats(): String {
+        val uid = android.os.Process.myUid()
+        val rx = android.net.TrafficStats.getUidRxBytes(uid)
+        val tx = android.net.TrafficStats.getUidTxBytes(uid)
+        fun format(bytes: Long): String = if (bytes < 0) "Unavailable" else
+            String.format(Locale.US, "%.2f MB (%d bytes)", bytes / 1048576.0, bytes)
+        return "App UID: " + uid + "\nReceived: " + format(rx) + "\nTransmitted: " + format(tx) +
+            "\nNote: Android reports cumulative app traffic since boot."
+    }
+
 }
