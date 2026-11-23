@@ -219,7 +219,9 @@ class MainActivity : Activity() {
         card("SAFE BEHAVIOR SIMULATOR", "Run a harmless mock sequence to study suspicious behavior indicators") {
             runTask("Running isolated behavior simulation…") { ResearchLab.simulateBenignBehavior() }
         }
-        card("ANDROID SECURITY BASELINE", "Review Android version, security patch and basic build posture") {\n            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }\n        }\n        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
+        card("ANDROID SECURITY BASELINE", "Review Android version, security patch and basic build posture") {
+            runTask("Collecting Android security baseline…") { DevicePosture.report(this) }\n        }
+        card("APP PERMISSION MONITOR", "Review permissions requested and granted by this app only") {
             runTask("Reviewing this app's permissions…") { ownPermissionReport() }
         }
     }
@@ -393,7 +395,8 @@ class MainActivity : Activity() {
             "أنشئ تقرير", "انشئ تقرير", "تقرير pdf", "تصدير التقرير" -> "report"
             "حركة البيانات", "استهلاك الشبكة" -> "traffic"
             "امسح الشاشة", "نظف الطرفية" -> "clear"
-            "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"\n            "افحص أمان الهاتف", "فحص أمان الهاتف", "تقرير أمان الجهاز" -> "devicecheck"
+            "أوقف الإيقاف التلقائي", "الغ الإيقاف التلقائي", "إلغاء الإيقاف التلقائي" -> "stopcancel"
+            "افحص أمان الهاتف", "فحص أمان الهاتف", "تقرير أمان الجهاز" -> "devicecheck"
             else -> value
         }
     }
