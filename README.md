@@ -1,19 +1,23 @@
-# ULTRA HACKER 2.0
+# ULTRA HACKER 3.0
 
-Native Android ethical cybersecurity and network diagnostics toolkit.
+Native Android toolkit for authorized cybersecurity learning and diagnostics.
 
 ## Features
-- Professional dark dashboard with HOME, TOOLS and TERMINAL sections
-- Terminal commands: help, clear, date, whoami, ip, dns, ping, rdap, headers, netcheck
-- Local network interface and IP information
-- Small-scope local LAN discovery (sampled private subnet addresses)
-- Restricted common-port checks for private IPv4 targets only (22, 80, 443, 8080)
-- HTTPS security-header inspection
-- Public RDAP domain registration lookup
-- Internet connectivity check
+- Dark dashboard with HOME, TOOLS and TERMINAL
+- DNS lookup, reachability checks, local interface information and bounded LAN discovery
+- Restricted common-port checks for private IPv4 addresses only
+- HTTPS security-header inspection and public RDAP lookup
+- SSL/TLS certificate details and HTTP response analysis
+- SHA-256 hashing, Base64 encode/decode and local secure password generation
+- Per-app cumulative network traffic counters
+- Terminal commands: help, clear, date, whoami, ip, dns, ping, rdap, headers, ssl, http, sha256, b64encode, b64decode, traffic, passgen, netcheck
 
 ## Build
-Push to `main` or manually run **Build Android APK** from GitHub Actions. Download the artifact named `ultra-hacker-v2-debug-apk`.
+Push to main or manually run **Build Android APK** in GitHub Actions. Download the artifact named `ultra-hacker-v3-debug-apk`.
 
-## Safety
-Use tools only on devices, networks, and websites you own or have explicit permission to assess. The app does not provide exploit automation, credential collection, stealth, or unauthorized access. Android sandbox permissions apply; this is a diagnostics terminal, not a root shell or full Linux terminal.
+## Notes
+- The app is not a root shell or full Linux terminal.
+- Traffic counters are cumulative Android UID counters since boot; they are not live throughput measurements.
+- ICMP reachability may be blocked by Android or the network.
+- HTTPS header checks use HEAD requests; some servers may not support HEAD.
+- Use the network and website assessment tools only on systems you own or are explicitly authorized to test.
