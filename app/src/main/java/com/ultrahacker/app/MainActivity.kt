@@ -6,7 +6,11 @@ import android.graphics.Color
 import android.view.Gravity
 import android.view.inputmethod.EditorInfo
 import android.text.InputType
-import android.widget.*
+import android.widget.Button
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import java.net.InetAddress
 import java.net.NetworkInterface
 import java.text.SimpleDateFormat
@@ -15,142 +19,198 @@ import java.util.Locale
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
-    private val bg = Color.rgb(5, 10, 8)
-    private val panel = Color.rgb(12, 22, 17)
-    private val neon = Color.rgb(0, 255, 120)
-    private val muted = Color.rgb(150, 180, 160)
+    private val backgroundColor = Color.rgb(5, 10, 8)
+    private val panelColor = Color.rgb(12, 22, 17)
+    private val neonColor = Color.rgb(0, 255, 120)
+    private val mutedColor = Color.rgb(150, 180, 160)
+
     private lateinit var output: TextView
-    private lateinit var command: EditText
+    private lateinit var commandInput: EditText
+    private lateinit var outputScroll: ScrollView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         buildUi()
-        printLine("ULTRA HACKER v1.0")
-        printLine("Authorized diagnostics only. Type help.")
-        printLine("----------------------------------------")
+        appendLine("ULTRA HACKER v1.0")
+        appendLine("Authorized diagnostics only. Type help.")
+        appendLine("----------------------------------------")
     }
 
     private fun buildUi() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(18, 24, 18, 18)
-            setBackgroundColor(bg)
+            setBackgroundColor(backgroundColor)
         }
-        val top = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+
+        val header = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
         val title = TextView(this).apply {
             text = "ULTRA HACKER"
             textSize = 24f
-            setTextColor(neon)
+            setTextColor(neonColor)
             typeface = android.graphics.Typeface.MONOSPACE
         }
-        val lang = Button(this).apply {
+
+        val languageButton = Button(this).apply {
             text = "عربي / EN"
             setOnClickListener {
-                title.text = if (title.text == "ULTRA HACKER") "ألترا هاكر" else "ULTRA HACKER"
+                title.text = if (title.text.toString() == "ULTRA HACKER") {
+                    "ألترا هاكر"
+                } else {
+                    "ULTRA HACKER"
+                }
             }
         }
-        top.addView(title, LinearLayout.LayoutParams(0, -2, 1f))
-        top.addView(lang)
-        root.addView(top)
+
+        header.addView(title, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        header.addView(languageButton)
+        root.addView(header)
+
         root.addView(TextView(this).apply {
             text = "ETHICAL CYBERSECURITY TOOLKIT • LOCAL DIAGNOSTICS"
             textSize = 10f
-            setTextColor(muted)
+            setTextColor(mutedColor)
             setPadding(0, 4, 0, 18)
         })
+
         root.addView(TextView(this).apply {
             text = "[ NETWORK ]     [ DNS ]     [ TERMINAL ]"
             textSize = 13f
-            setTextColor(neon)
-            setBackgroundColor(panel)
+            setTextColor(neonColor)
+            setBackgroundColor(panelColor)
             setPadding(12, 14, 12, 14)
         })
+
         output = TextView(this).apply {
             textSize = 13f
-            setTextColor(neon)
+            setTextColor(neonColor)
             typeface = android.graphics.Typeface.MONOSPACE
             setPadding(12, 12, 12, 12)
             setTextIsSelectable(true)
         }
-        val scroll = ScrollView(this).apply {
-            setBackgroundColor(panel)
+
+        outputScroll = ScrollView(this).apply {
+            setBackgroundColor(panelColor)
             addView(output)
         }
-        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f).apply {
+
+        root.addView(outputScroll, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+        ).apply {
             topMargin = 14
             bottomMargin = 12
         })
-        val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        command = EditText(this).apply {
+
+        val inputRow = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        commandInput = EditText(this).apply {
             hint = "Enter command (help)"
-            setHintTextColor(muted)
+            setHintTextColor(mutedColor)
             setTextColor(Color.WHITE)
             textSize = 14f
-            singleLine = true
+            setSingleLine(true)
             inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEND
-            setBackgroundColor(panel)
+            setBackgroundColor(panelColor)
             setPadding(12, 8, 12, 8)
-            setOnEditorActionListener { _, action, _ ->
-                if (action == EditorInfo.IME_ACTION_SEND) { runCommand(); true } else false
+            setOnEditorActionListener { _, actionId, _ ->
+                if (actionId == EditorInfo.IME_ACTION_SEND) {
+                    runCommand()
+                    true
+                } else {
+                    false
+                }
             }
         }
-        row.addView(command, LinearLayout.LayoutParams(0, -2, 1f))
-        row.addView(Button(this).apply {
+
+        inputRow.addView(commandInput, LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+        ))
+
+        inputRow.addView(Button(this).apply {
             text = "RUN"
-            setTextColor(neon)
+            setTextColor(neonColor)
             setOnClickListener { runCommand() }
         })
-        root.addView(row)
+
+        root.addView(inputRow)
         setContentView(root)
     }
 
-    private fun printLine(s: String) { output.append("$ $s\n") }
+    private fun appendLine(message: String) {
+        output.append("$ $message\n")
+        outputScroll.post { outputScroll.fullScroll(ScrollView.FOCUS_DOWN) }
+    }
 
     private fun runCommand() {
-        val raw = command.text.toString().trim()
-        if (raw.isEmpty()) return
-        command.setText("")
-        printLine(raw)
-        val parts = raw.split(Regex("\\s+"), limit = 2)
+        val rawCommand = commandInput.text.toString().trim()
+        if (rawCommand.isEmpty()) return
+
+        commandInput.setText("")
+        appendLine(rawCommand)
+
+        val parts = rawCommand.split(Regex("\\s+"), limit = 2)
         when (parts[0].lowercase(Locale.ROOT)) {
             "help" -> {
-                printLine("Available: help, clear, date, whoami, ip, dns <hostname>, ping <hostname>")
-                printLine("Use only on systems you own or are authorized to test.")
+                appendLine("Commands: help, clear, date, whoami, ip, dns <hostname>, ping <hostname>")
+                appendLine("Run diagnostics only against systems you own or are authorized to test.")
             }
             "clear" -> output.text = ""
-            "date" -> printLine(SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()))
-            "whoami" -> printLine("ultra-hacker (Android app sandbox)")
-            "ip" -> printLine("Local IPv4: ${localIp()}")
+            "date" -> appendLine(
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date())
+            )
+            "whoami" -> appendLine("ultra-hacker (Android app sandbox)")
+            "ip" -> appendLine("Local IPv4: ${getLocalIpv4()}")
             "dns", "ping" -> {
                 val host = parts.getOrNull(1)?.trim().orEmpty()
-                if (host.isBlank() || host.contains(" ")) printLine("Usage: ${parts[0]} <hostname>")
-                else {
-                    printLine("Working on $host ...")
-                    thread {
-                        val result = try {
-                            val address = InetAddress.getByName(host)
-                            if (parts[0].equals("dns", true)) "DNS: ${address.hostAddress}"
-                            else "Resolved ${address.hostAddress}; reachable=${address.isReachable(3000)}"
-                        } catch (e: Exception) { "Error: ${e.localizedMessage ?: "lookup failed"}" }
-                        runOnUiThread { printLine(result) }
+                if (host.isBlank() || host.any { it.isWhitespace() }) {
+                    appendLine("Usage: ${parts[0]} <hostname>")
+                    return
+                }
+
+                appendLine("Checking $host ...")
+                thread {
+                    val result = try {
+                        val address = InetAddress.getByName(host)
+                        if (parts[0].equals("dns", ignoreCase = true)) {
+                            "DNS: ${address.hostAddress ?: "No address"}"
+                        } else {
+                            val reachable = address.isReachable(3000)
+                            "Resolved: ${address.hostAddress}; reachable=$reachable"
+                        }
+                    } catch (exception: Exception) {
+                        "Error: ${exception.localizedMessage ?: "Network lookup failed"}"
                     }
+
+                    runOnUiThread { appendLine(result) }
                 }
             }
-            else -> printLine("Unknown command. Type help.")
+            else -> appendLine("Unknown command. Type help.")
         }
     }
 
-    private fun localIp(): String = try {
-        val interfaces = NetworkInterface.getNetworkInterfaces()
-        while (interfaces.hasMoreElements()) {
-            val addresses = interfaces.nextElement().inetAddresses
-            while (addresses.hasMoreElements()) {
-                val address = addresses.nextElement()
-                if (!address.isLoopbackAddress && address.hostAddress?.contains(':') == false)
-                    return address.hostAddress ?: "Unavailable"
+    private fun getLocalIpv4(): String {
+        return try {
+            val interfaces = NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val addresses = interfaces.nextElement().inetAddresses
+                while (addresses.hasMoreElements()) {
+                    val address = addresses.nextElement()
+                    if (!address.isLoopbackAddress &&
+                        address.hostAddress?.contains(':') == false
+                    ) {
+                        return address.hostAddress ?: "Unavailable"
+                    }
+                }
             }
+            "Unavailable"
+        } catch (_: Exception) {
+            "Unavailable"
         }
-        "Unavailable"
-    } catch (_: Exception) { "Unavailable" }
+    }
 }
