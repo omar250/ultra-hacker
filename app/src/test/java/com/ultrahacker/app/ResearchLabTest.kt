@@ -7,7 +7,7 @@ class ResearchLabTest {
     @Test
     fun reportsSuspiciousApiWithLineNumber() {
         val report = ResearchLab.analyzeSource(
-            "class Sample {\\n    fun run() { Runtime.getRuntime().exec(\\\"id\\\") }\\n}"
+            "class Sample {\n    fun run() { Runtime.getRuntime().exec(\"id\") }\n}"
         )
         assertTrue(report.contains("Process execution API"))
         assertTrue(report.contains("line(s) 2"))
