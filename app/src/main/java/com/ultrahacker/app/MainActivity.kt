@@ -388,7 +388,7 @@ class MainActivity : Activity() {
                 "\nValid from: " + cert.notBefore +
                 "\nValid until: " + cert.notAfter +
                 "\nCurrently valid: " + valid +
-                "\nTLS protocol: " + c.sslSocketFactory.defaultCipherSuites.firstOrNull().orEmpty()
+                "\nNegotiated cipher suite: " + c.cipherSuite
         } finally { c.disconnect() }
     }
 
