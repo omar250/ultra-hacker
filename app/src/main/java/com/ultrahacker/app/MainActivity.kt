@@ -69,7 +69,11 @@ class MainActivity : Activity() {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(12), 0, 0)
         }
-        root.addView(content, LinearLayout.LayoutParams(-1, 0, 1f))
+        val contentScroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
+        }
+        root.addView(contentScroll, LinearLayout.LayoutParams(-1, 0, 1f))
         root.addView(label("AUTHORIZED TESTING ONLY • ULTRA HACKER", 9f, muted).apply {
             gravity = Gravity.CENTER; setPadding(0, dp(10), 0, 0)
         })
